@@ -1,0 +1,1 @@
+this repo is for my app for bachelor thesis. goal of this app is to search words to see in which context they are used and with function to memorise them by seeing a page of searched word (but the word itself is blurred)
