@@ -38,7 +38,7 @@ for index_name in index_names:
         es.indices.create(index=index_name)
 
 # Read the CSV files and index the documents
-csv_files = ['sentences.csv', 'cleaned_words.csv']
+csv_files = ['../sentences.csv', '../cleaned_words.csv']
 for index_name, csv_file in zip(index_names, csv_files):
     with open(csv_file, mode='r', encoding='utf-8') as file:
         csv_reader = csv.DictReader(file)
