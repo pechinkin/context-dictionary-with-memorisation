@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    container_name: mvp2-elasticsearch
+    image: bitnami/elasticsearch:8.12.2
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ELASTIC_PASSWORD=changeme
+      - ELASTICSEARCH_USERNAME=elastic
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/bitnami/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - elastic
+
+  python-app:
+    container_name: mvp2-python-app
+    build:
+      context: .
+      dockerfile: python.Dockerfile
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ../cleaned_words.csv:/app/cleaned_words.csv
+      - ../sentences.csv:/app/sentences.csv
+      - ./password.txt:/app/password.txt
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ELASTICSEARCH_USERNAME=elastic
+    networks:
+      - elastic
+
+  search-app:
+    container_name: mvp2-search-app
+    build:
+      context: .
+      dockerfile: python.Dockerfile
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./password.txt:/app/password.txt
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ELASTICSEARCH_USERNAME=elastic
+    command: python3 check_elastic.py
+    stdin_open: true
+    tty: true
+    networks:
+      - elastic
+
+volumes:
+  elasticsearch-data:
+    driver: local
+
+networks:
+  elastic:
+    driver: bridge 
