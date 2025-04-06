@@ -40,25 +40,6 @@ services:
     networks:
       - elastic
 
-  search-app:
-    container_name: mvp2-search-app
-    build:
-      context: .
-      dockerfile: python.Dockerfile
-    depends_on:
-      - elasticsearch
-    volumes:
-      - ./password.txt:/app/password.txt
-    environment:
-      - ELASTICSEARCH_HOST=elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - ELASTICSEARCH_USERNAME=elastic
-    command: python3 check_elastic.py
-    stdin_open: true
-    tty: true
-    networks:
-      - elastic
-
 volumes:
   elasticsearch-data:
     driver: local
