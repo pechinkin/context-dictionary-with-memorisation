@@ -45,15 +45,6 @@ def wait_for_elasticsearch():
 # --- Подключение к Elasticsearch ---
 try:
     es = wait_for_elasticsearch()
-    es.indices.put_settings(
-        index="*",
-        body={
-            "index": {
-                "refresh_interval": "-1",
-                "number_of_replicas": "0"
-            }
-        }
-    )
 except Exception as e:
     print(f"[ERROR] Неожиданная ошибка: {e}", file=sys.stderr, flush=True)
     exit(1)
@@ -61,12 +52,28 @@ except Exception as e:
 # --- Индексы ---
 index_names = ['sentences', 'definitions']
 
+# Создаем индексы
 for index_name in index_names:
     if es.indices.exists(index=index_name):
         print(f"[INFO] Удаление существующего индекса {index_name}...", file=sys.stderr, flush=True)
         es.indices.delete(index=index_name)
     es.indices.create(index=index_name)
     print(f"[OK] Создан индекс: {index_name}", file=sys.stderr, flush=True)
+
+# Применяем настройки к конкретным индексам
+try:
+    for index_name in index_names:
+        es.indices.put_settings(
+            index=index_name,
+            body={
+                "index": {
+                    "refresh_interval": "-1",
+                    "number_of_replicas": "0"
+                }
+            }
+        )
+except Exception as e:
+    print(f"[ERROR] Ошибка при настройке индексов: {e}", file=sys.stderr, flush=True)
 
 # --- Загрузка CSV в память ---
 def load_csv_data(csv_file):
@@ -91,7 +98,7 @@ def bulk_upload(index_name, rows, batch_size=1000):
                 helpers.bulk(es, actions, raise_on_error=False)
             except Exception as e:
                 print(f"[ERROR] Ошибка при загрузке блока {i // batch_size + 1}: {e}", file=sys.stderr, flush=True)
-            pbar.update(len(batch))  # Обновление прогресса
+            pbar.update(len(batch))
 
 # --- Обработка файлов ---
 def process_definitions(file_path):
@@ -110,16 +117,18 @@ if __name__ == "__main__":
     process_definitions('cleaned_words.csv')
     process_sentences('sentences.csv')
 
+    # Восстанавливаем настройки для конкретных индексов
     try:
-        es.indices.put_settings(
-            index="*",
-            body={
-                "index": {
-                    "refresh_interval": "1s",
-                    "number_of_replicas": "1"
+        for index_name in index_names:
+            es.indices.put_settings(
+                index=index_name,
+                body={
+                    "index": {
+                        "refresh_interval": "1s",
+                        "number_of_replicas": "1"
+                    }
                 }
-            }
-        )
+            )
     except Exception as e:
         print(f"[ERROR] Ошибка при восстановлении настроек индекса: {e}", file=sys.stderr, flush=True)
 
