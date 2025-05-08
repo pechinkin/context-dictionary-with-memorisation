@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from elasticsearch import Elasticsearch
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
@@ -22,8 +23,21 @@ es = Elasticsearch(
     timeout=30
 )
 
+# Подключение к SQLite и создание таблицы
+def init_sqlite_db(db_path='words.db'):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS word_weights (
+            word TEXT PRIMARY KEY,
+            weight INTEGER DEFAULT 0
+        )
+    ''')
+    conn.commit()
+    return conn
+
+# Поиск слова в Elasticsearch
 def search_word(word):
-    # Поиск определения
     definition_query = {
         "query": {
             "match": {
@@ -31,10 +45,8 @@ def search_word(word):
             }
         }
     }
-    
     definition_result = es.search(index='definitions', body=definition_query)
-    
-    # Поиск предложений
+
     sentences_query = {
         "query": {
             "match": {
@@ -43,13 +55,12 @@ def search_word(word):
         },
         "size": 5
     }
-    
     sentences_result = es.search(index='sentences', body=sentences_query)
-    
+
     return definition_result, sentences_result
 
+# Вывод результатов
 def print_results(definition_result, sentences_result):
-    # Вывод определения
     if definition_result['hits']['total']['value'] > 0:
         definition = definition_result['hits']['hits'][0]['_source']
         print(f"\nОпределение слова '{definition['word']}':")
@@ -67,10 +78,13 @@ def print_results(definition_result, sentences_result):
     else:
         print("\nПримеры использования не найдены")
 
+# Основной цикл
 def main():
     print("Поиск определений и примеров использования слов")
     print("Введите 'exit' для выхода")
-    
+
+    conn = init_sqlite_db()
+
     while True:
         user_input = input("\nВведите слово для поиска: ").strip()
         
@@ -87,6 +101,8 @@ def main():
             print_results(definition_result, sentences_result)
         except Exception as e:
             print(f"Произошла ошибка: {str(e)}")
+
+    conn.close()
 
 if __name__ == "__main__":
     main()
