@@ -36,6 +36,18 @@ def init_sqlite_db(db_path='words.db'):
     conn.commit()
     return conn
 
+# Обновление веса слова
+def update_word_weight(conn, word):
+    cursor = conn.cursor()
+    cursor.execute('SELECT weight FROM word_weights WHERE word = ?', (word,))
+    result = cursor.fetchone()
+    if result:
+        new_weight = result[0] + 1
+        cursor.execute('UPDATE word_weights SET weight = ? WHERE word = ?', (new_weight, word))
+    else:
+        cursor.execute('INSERT INTO word_weights (word, weight) VALUES (?, ?)', (word, 1))
+    conn.commit()
+
 # Поиск слова в Elasticsearch
 def search_word(word):
     definition_query = {
@@ -97,7 +109,9 @@ def main():
             continue
             
         try:
-            definition_result, sentences_result = search_word(user_input)
+            word = user_input.lower()
+            update_word_weight(conn, word)
+            definition_result, sentences_result = search_word(word)
             print_results(definition_result, sentences_result)
         except Exception as e:
             print(f"Произошла ошибка: {str(e)}")
