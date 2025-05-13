@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 from elasticsearch import Elasticsearch
 import warnings
@@ -65,14 +66,33 @@ def search_word(word):
                 "text": word
             }
         },
-        "size": 5
+        "size": 10
     }
     sentences_result = es.search(index='sentences', body=sentences_query)
 
     return definition_result, sentences_result
+    
+# Ранжирование предложений по сумме весов слов
+def rank_sentences_by_word_weight(conn, sentences):
+    ranked = []
+    cursor = conn.cursor()
+
+    for hit in sentences:
+        text = hit['_source']['text']
+        words = re.findall(r'\b\w+\b', text.lower())
+        total_weight = 0
+        for word in words:
+            cursor.execute('SELECT weight FROM word_weights WHERE word = ?', (word,))
+            result = cursor.fetchone()
+            if result:
+                total_weight += result[0]
+        ranked.append((total_weight, hit))
+
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    return [hit for _, hit in ranked]
 
 # Вывод результатов
-def print_results(definition_result, sentences_result):
+def print_results(definition_result, sentences_result, conn):
     if definition_result['hits']['total']['value'] > 0:
         definition = definition_result['hits']['hits'][0]['_source']
         print(f"\nОпределение слова '{definition['word']}':")
@@ -83,8 +103,9 @@ def print_results(definition_result, sentences_result):
     
     # Вывод предложений
     if sentences_result['hits']['total']['value'] > 0:
-        print("\nПримеры использования:")
-        for hit in sentences_result['hits']['hits']:
+        print("\nПримеры использования (отсортированы по весу слов):")
+        sorted_hits = rank_sentences_by_word_weight(conn, sentences_result['hits']['hits'])
+        for hit in sorted_hits:
             sentence = hit['_source']
             print(f"- {sentence['text']} (Уровень: {sentence['label']})")
     else:
@@ -112,7 +133,7 @@ def main():
             word = user_input.lower()
             update_word_weight(conn, word)
             definition_result, sentences_result = search_word(word)
-            print_results(definition_result, sentences_result)
+            print_results(definition_result, sentences_result, conn)
         except Exception as e:
             print(f"Произошла ошибка: {str(e)}")
 
